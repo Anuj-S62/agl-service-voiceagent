@@ -168,9 +168,7 @@ cython_debug/
 # model dirs
 *-model/
 
-# grpc files
-
-generated/
-
 # logs dir
 logs/
+
+generated/

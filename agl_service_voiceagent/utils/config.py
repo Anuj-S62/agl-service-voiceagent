@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import logging
 import configparser
 
 config = configparser.ConfigParser()
 config_path = None
+logger = None
 
 def set_config_path(path):
     """
@@ -25,14 +28,25 @@ def set_config_path(path):
     """
     global config_path
     config_path = path
-    config.read(config_path)
 
 def load_config():
     """
-    Loads the config file.
+    Loads the config file and initializes the logger.
+
+    Also creates logging directory if it doesn't already exist.
     """
     if config_path is not None:
+        global logger
         config.read(config_path)
+        
+        # create the base log dir if not exists
+        if not os.path.exists(get_config_value('BASE_LOG_DIR')):
+            os.makedirs(get_config_value('BASE_LOG_DIR'))
+
+        logging.basicConfig(filename=get_config_value('BASE_LOG_DIR')+'voiceagent_server.log', level=logging.DEBUG, format='[%(asctime)s] [%(name)s] [%(levelname)s]: (%(filename)s:%(funcName)s) %(message)s', filemode='a')
+        logger = logging.getLogger()
+        logger.info("-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-")
+
     else:
         raise Exception("Config file path not provided.")
 
@@ -52,3 +66,15 @@ def get_config_value(key, group="General"):
     Gets a value from the config file.
     """
     return config.get(group, key)
+
+def get_logger():
+    """
+    Gets the initialized logger.
+    """
+    if logger is not None:
+        return logger
+    
+    else:
+        logging.basicConfig(level=logging.DEBUG)
+        print("[-] Error: Failed to get logger. Logger is not initialized!")
+        logging.error("Failed to get logger. Logger is not initialized!")
