@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+sys.path.append("../")
 import json
 import time
 import threading
@@ -28,6 +30,7 @@ from agl_service_voiceagent.utils.config import get_config_value, get_logger
 from agl_service_voiceagent.utils.common import generate_unique_uuid, delete_file
 from agl_service_voiceagent.nlu.snips_interface import SnipsInterface
 from agl_service_voiceagent.nlu.rasa_interface import RASAInterface
+from agl_service_voiceagent.utils.stt_online_service import STTOnlineService
 
 
 class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
@@ -46,7 +49,7 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
         self.channels = int(get_config_value('CHANNELS'))
         self.sample_rate = int(get_config_value('SAMPLE_RATE'))
         self.bits_per_sample = int(get_config_value('BITS_PER_SAMPLE'))
-        self.stt_model_path = get_config_value('STT_MODEL_PATH')
+        self.vosk_model_path = get_config_value('VOSK_MODEL_PATH')
         self.wake_word_model_path = get_config_value('WAKE_WORD_MODEL_PATH')
         self.snips_model_path = get_config_value('SNIPS_MODEL_PATH')
         self.rasa_model_path = get_config_value('RASA_MODEL_PATH')
@@ -56,10 +59,23 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
         self.store_voice_command = bool(int(get_config_value('STORE_VOICE_COMMANDS')))
         self.logger = get_logger()
 
+        # load the whisper model_path
+        self.whisper_model_path = get_config_value('WHISPER_MODEL_PATH')
+
+        # loading values for online mode
+        self.online_mode = bool(int(get_config_value('ONLINE_MODE')))
+        if self.online_mode:
+            self.online_mode_address = get_config_value('ONLINE_MODE_ADDRESS')
+            self.online_mode_port = int(get_config_value('ONLINE_MODE_PORT'))
+            self.online_mode_timeout = int(get_config_value('ONLINE_MODE_TIMEOUT'))
+            self.stt_online = STTOnlineService(self.online_mode_address, self.online_mode_port, self.online_mode_timeout)
+            self.stt_online.initialize_connection()
+            
+
         # Initialize class methods
         self.logger.info("Loading Speech to Text and Wake Word Model...")
-        self.stt_model = STTModel(self.stt_model_path, self.sample_rate)
-        self.stt_wake_word_model = STTModel(self.wake_word_model_path, self.sample_rate)
+        self.stt_model = STTModel(self.vosk_model_path, self.whisper_model_path,self.sample_rate)
+        self.stt_wake_word_model = STTModel(self.wake_word_model_path, self.whisper_model_path,self.sample_rate)
         self.logger.info("Speech to Text and Wake Word Model loaded successfully.")
 
         self.logger.info("Starting SNIPS intent engine...")
@@ -153,6 +169,16 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
         log_intent_slots = []
 
         for request in requests:
+            stt_framework = ''
+            if request.stt_framework == voice_agent_pb2.VOSK:
+                stt_framework = 'vosk'
+            elif request.stt_framework == voice_agent_pb2.WHISPER:
+                stt_framework = 'whisper'
+            
+            use_online_mode = False
+            if request.online_mode == voice_agent_pb2.ONLINE:
+                use_online_mode = True
+
             if request.record_mode == voice_agent_pb2.MANUAL:
 
                 if request.action == voice_agent_pb2.START:
@@ -187,14 +213,33 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                     del self.rvc_stream_uuids[stream_uuid]
 
                     recorder.stop_recording()
-                    recognizer_uuid = self.stt_model.setup_recognizer()
-                    stt = self.stt_model.recognize_from_file(recognizer_uuid, audio_file)
+                                      
+                    used_kaldi = False
 
+                    if use_online_mode and self.online_mode:
+                        print("Recognizing voice command using online mode.")
+                        if self.stt_online.initialized:
+                            stt = self.stt_online.recognize_audio(audio_file=audio_file)
+                        elif not self.stt_online.initialized:
+                            self.stt_online.initialize_connection()
+                            stt = self.stt_online.recognize_audio(audio_file=audio_file)
+                    else:
+                        recognizer_uuid = self.stt_model.setup_vosk_recognizer()
+                        stt = self.stt_model.recognize_from_file(recognizer_uuid, audio_file,stt_framework=stt_framework)
+                        used_kaldi = True
+
+                    if use_online_mode and self.online_mode and stt is None:
+                        print("Online mode enabled but failed to recognize voice command. Switching to offline mode.")
+                        recognizer_uuid = self.stt_model.setup_vosk_recognizer()
+                        stt = self.stt_model.recognize_from_file(recognizer_uuid, audio_file,stt_framework=stt_framework)
+                        used_kaldi = True
+
+
+                    print(stt)
                     if stt not in ["FILE_NOT_FOUND", "FILE_FORMAT_INVALID", "VOICE_NOT_RECOGNIZED", ""]:
                         if request.nlu_model == voice_agent_pb2.SNIPS:
                             extracted_intent = self.snips_interface.extract_intent(stt)
                             intent, intent_actions = self.snips_interface.process_intent(extracted_intent)
-
                             if not intent or intent == "":
                                 status = voice_agent_pb2.INTENT_NOT_RECOGNIZED
                             
@@ -223,7 +268,9 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                         status = voice_agent_pb2.VOICE_NOT_RECOGNIZED
                     
                     # cleanup the kaldi recognizer
-                    self.stt_model.cleanup_recognizer(recognizer_uuid)
+                    if used_kaldi:
+                        self.stt_model.cleanup_recognizer(recognizer_uuid)
+                        used_kaldi = False
 
                     # delete the audio file
                     if not self.store_voice_command:   

@@ -1,0 +1,23 @@
+// proto file for audio processing service for whiisper online service
+
+syntax = "proto3";
+
+package audioproc;
+
+service AudioProcessing {
+  // Sends audio data and receives processed text.
+  rpc ProcessAudio (AudioRequest) returns (TextResponse);
+}
+
+// The request message containing the audio data.
+message AudioRequest {
+  bytes audio_data = 1;
+}
+
+// The response message containing the processed text.
+message TextResponse {
+  string text = 1;
+}
+
+// usage: 
+// python -m grpc_tools.protoc -I. --python_out=./generated/ --grpc_python_out=./generated/ audio_processing.proto

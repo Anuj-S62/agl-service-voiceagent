@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+sys.path.append("../")
 import grpc
 from concurrent import futures
 from agl_service_voiceagent.generated import voice_agent_pb2_grpc
@@ -24,7 +26,8 @@ def run_server():
     logger = get_logger()
     SERVER_URL = get_config_value('SERVER_ADDRESS') + ":" + str(get_config_value('SERVER_PORT'))
     print("Starting Voice Agent Service...")
-    print(f"STT Model Path: {get_config_value('STT_MODEL_PATH')}")
+    print(f"VOSK Model Path: {get_config_value('VOSK_MODEL_PATH')}")
+    print(f"WHISPER Model Path: {get_config_value('WHISPER_MODEL_PATH')}")
     print(f"Audio Store Directory: {get_config_value('BASE_AUDIO_DIR')}")
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     voice_agent_pb2_grpc.add_VoiceAgentServiceServicer_to_server(VoiceAgentServicer(), server)
