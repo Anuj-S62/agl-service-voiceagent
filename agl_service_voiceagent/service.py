@@ -23,6 +23,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 generated_dir = os.path.join(current_dir, "generated")
 # Add the "generated" folder to sys.path
 sys.path.append(generated_dir)
+sys.path.append("../")
 
 import argparse
 from agl_service_voiceagent.utils.config import set_config_path, load_config, update_config_value, get_config_value, get_logger
@@ -49,8 +50,9 @@ def main():
     # Add the arguments for the server
     server_parser.add_argument('--default', action='store_true', help='Starts the server based on default config file.')
     server_parser.add_argument('--config', required=False, help='Path to a config file. Server is started based on this config file.')
-    server_parser.add_argument('--stt-model-path', required=False, help='Path to the Speech To Text model for Voice Commad detection. Currently only supports VOSK Kaldi.')
-    server_parser.add_argument('--ww-model-path', required=False, help='Path to the Speech To Text model for Wake Word detection. Currently only supports VOSK Kaldi. Defaults to the same model as --stt-model-path if not provided.')
+    server_parser.add_argument('--vosk-model-path', required=False, help='Path to the Vosk Speech To Text model for Voice Commad detection.')
+    server_parser.add_argument('--whisper-model-path', required=False, help='Path to the Whisper Speech To Text model for Voice Commad detection.')
+    server_parser.add_argument('--ww-model-path', required=False, help='Path to the Speech To Text model for Wake Word detection. Currently only supports VOSK Kaldi. Defaults to the same model as --vosk-model-path if not provided.')
     server_parser.add_argument('--snips-model-path', required=False, help='Path to the Snips NLU model.')
     server_parser.add_argument('--rasa-model-path', required=False, help='Path to the RASA NLU model.')
     server_parser.add_argument('--rasa-detached-mode', required=False, help='Assume that the RASA server is already running and does not start it as a sub process.')
@@ -66,6 +68,7 @@ def main():
     client_parser.add_argument('--mode', help='Mode to run the client in. Supported modes: "auto" and "manual".')
     client_parser.add_argument('--nlu', help='NLU engine/model to use. Supported NLU engines: "snips" and "rasa".')
     client_parser.add_argument('--recording-time', help='Number of seconds to continue recording the voice command. Required by the \'manual\' mode. Defaults to 10 seconds.')
+    client_parser.add_argument('--stt-framework', help='STT framework to use. Supported frameworks: "vosk". Defaults to "vosk".')
 
     args = parser.parse_args()
     
@@ -74,8 +77,12 @@ def main():
 
     elif args.subcommand == 'run-server':
         if not args.default and not args.config:
-            if not args.stt_model_path:
-                print("Error: The --stt-model-path is missing. Please provide a value. Use --help to see available options.")
+            if not args.vosk_model_path:
+                print("Error: The --vosk-model-path is missing. Please provide a value. Use --help to see available options.")
+                exit(1)
+
+            if not args.whisper_model_path:
+                print("Error: The --whisper-model-path is missing. Please provide a value. Use --help to see available options.")
                 exit(1)
             
             if not args.snips_model_path:
@@ -105,21 +112,24 @@ def main():
             logger.info("Starting Voice Agent Service in server mode using CLI provided params...")
             
             # Get the values provided by the user
-            stt_path = args.stt_model_path
+            vosk_path = args.vosk_model_path
+            whisper_path = args.whisper_model_path
             snips_model_path = args.snips_model_path
             rasa_model_path = args.rasa_model_path
             intents_vss_map_path = args.intents_vss_map_path
             vss_signals_spec_path = args.vss_signals_spec_path
             
             # Convert to an absolute path if it's a relative path
-            stt_path = add_trailing_slash(os.path.abspath(stt_path)) if not os.path.isabs(stt_path) else stt_path
+            vosk_path = add_trailing_slash(os.path.abspath(vosk_path)) if not os.path.isabs(vosk_path) else vosk_path
+            whisper_path = add_trailing_slash(os.path.abspath(whisper_path)) if not os.path.isabs(whisper_path) else whisper_path
             snips_model_path = add_trailing_slash(os.path.abspath(snips_model_path)) if not os.path.isabs(snips_model_path) else snips_model_path
             rasa_model_path = add_trailing_slash(os.path.abspath(rasa_model_path)) if not os.path.isabs(rasa_model_path) else rasa_model_path
             intents_vss_map_path = os.path.abspath(intents_vss_map_path) if not os.path.isabs(intents_vss_map_path) else intents_vss_map_path
             vss_signals_spec_path = os.path.abspath(vss_signals_spec_path) if not os.path.isabs(vss_signals_spec_path) else vss_signals_spec_path
             
             # Also update the config.ini file
-            update_config_value(stt_path, 'STT_MODEL_PATH')
+            update_config_value(vosk_path, 'VOSK_MODEL_PATH')
+            update_config_value(whisper_path, 'WHISPER_MODEL_PATH')
             update_config_value(snips_model_path, 'SNIPS_MODEL_PATH')
             update_config_value(rasa_model_path, 'RASA_MODEL_PATH')
             update_config_value(intents_vss_map_path, 'INTENTS_VSS_MAP')
@@ -162,7 +172,6 @@ def main():
 
             logger = get_logger()
             logger.info(f"Starting Voice Agent Service in server mode using the default config file...")
-        
         # create the base audio dir if not exists
         if not os.path.exists(get_config_value('BASE_AUDIO_DIR')):
             os.makedirs(get_config_value('BASE_AUDIO_DIR'))
@@ -176,6 +185,7 @@ def main():
         mode = ""
         action = args.action
         recording_time = 5 # seconds
+        stt_framework = args.stt_framework or "vosk"
 
         if action not in ["GetStatus", "DetectWakeWord", "ExecuteVoiceCommand", "ExecuteTextCommand"]:
             print("Error: Invalid value for --action. Supported actions: 'GetStatus', 'DetectWakeWord', 'ExecuteVoiceCommand' and 'ExecuteTextCommand'. Use --help to see available options.")
@@ -199,8 +209,13 @@ def main():
             mode = args.mode
             if mode == "manual" and args.recording_time:
                 recording_time = int(args.recording_time)
-        
-        run_client(server_address, server_port, action, mode, nlu_engine, recording_time)
+            if args.stt_framework and args.stt_framework not in ['vosk', 'whisper']:
+                print("Error: Invalid value for --stt-framework. Supported frameworks: 'vosk' and 'whisper'. Use --help to see available options.")
+                exit(1)
+            if args.stt_framework:
+                stt_framework = args.stt_framework
+
+        run_client(server_address, server_port, action, mode, nlu_engine, recording_time, stt_framework)
 
     else:
         print_version()

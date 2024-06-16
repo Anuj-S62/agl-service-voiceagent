@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+sys.path.append("../")
 import json
 import time
 import threading
@@ -46,7 +48,7 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
         self.channels = int(get_config_value('CHANNELS'))
         self.sample_rate = int(get_config_value('SAMPLE_RATE'))
         self.bits_per_sample = int(get_config_value('BITS_PER_SAMPLE'))
-        self.stt_model_path = get_config_value('STT_MODEL_PATH')
+        self.vosk_model_path = get_config_value('VOSK_MODEL_PATH')
         self.wake_word_model_path = get_config_value('WAKE_WORD_MODEL_PATH')
         self.snips_model_path = get_config_value('SNIPS_MODEL_PATH')
         self.rasa_model_path = get_config_value('RASA_MODEL_PATH')
@@ -56,10 +58,14 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
         self.store_voice_command = bool(int(get_config_value('STORE_VOICE_COMMANDS')))
         self.logger = get_logger()
 
+        # load the whisper model_path
+        self.whisper_model_path = get_config_value('WHISPER_MODEL_PATH')
+        # self.whisper_model_path = "base"
+
         # Initialize class methods
         self.logger.info("Loading Speech to Text and Wake Word Model...")
-        self.stt_model = STTModel(self.stt_model_path, self.sample_rate)
-        self.stt_wake_word_model = STTModel(self.wake_word_model_path, self.sample_rate)
+        self.stt_model = STTModel(self.vosk_model_path, self.whisper_model_path,self.sample_rate)
+        self.stt_wake_word_model = STTModel(self.wake_word_model_path, self.whisper_model_path,self.sample_rate)
         self.logger.info("Speech to Text and Wake Word Model loaded successfully.")
 
         self.logger.info("Starting SNIPS intent engine...")
@@ -153,6 +159,12 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
         log_intent_slots = []
 
         for request in requests:
+            stt_framework = ''
+            if request.stt_framework == voice_agent_pb2.VOSK:
+                stt_framework = 'vosk'
+            elif request.stt_framework == voice_agent_pb2.WHISPER:
+                stt_framework = 'whisper'
+
             if request.record_mode == voice_agent_pb2.MANUAL:
 
                 if request.action == voice_agent_pb2.START:
@@ -187,14 +199,14 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                     del self.rvc_stream_uuids[stream_uuid]
 
                     recorder.stop_recording()
-                    recognizer_uuid = self.stt_model.setup_recognizer()
-                    stt = self.stt_model.recognize_from_file(recognizer_uuid, audio_file)
+                    recognizer_uuid = self.stt_model.setup_vosk_recognizer()
+                    stt = self.stt_model.recognize_from_file(recognizer_uuid, audio_file,stt_framework=stt_framework)
 
+                    print(stt)
                     if stt not in ["FILE_NOT_FOUND", "FILE_FORMAT_INVALID", "VOICE_NOT_RECOGNIZED", ""]:
                         if request.nlu_model == voice_agent_pb2.SNIPS:
                             extracted_intent = self.snips_interface.extract_intent(stt)
                             intent, intent_actions = self.snips_interface.process_intent(extracted_intent)
-
                             if not intent or intent == "":
                                 status = voice_agent_pb2.INTENT_NOT_RECOGNIZED
                             

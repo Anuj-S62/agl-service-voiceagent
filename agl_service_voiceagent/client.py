@@ -14,16 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+sys.path.append("../")
 import time
 import grpc
 from agl_service_voiceagent.generated import voice_agent_pb2
 from agl_service_voiceagent.generated import voice_agent_pb2_grpc
 
-def run_client(server_address, server_port, action, mode, nlu_engine, recording_time):
+def run_client(server_address, server_port, action, mode, nlu_engine, recording_time,stt_framework):
     SERVER_URL = server_address + ":" + server_port
     nlu_engine = voice_agent_pb2.RASA if nlu_engine == "rasa" else voice_agent_pb2.SNIPS
     print("Starting Voice Agent Client...")
     print(f"Client connecting to URL: {SERVER_URL}")
+    print("STT Framework:", stt_framework)
     with grpc.insecure_channel(SERVER_URL) as channel:
         print("Press Ctrl+C to stop the client.")
         print("Voice Agent Client started!")
@@ -55,14 +58,15 @@ def run_client(server_address, server_port, action, mode, nlu_engine, recording_
 
             elif mode == 'manual':
                 stub = voice_agent_pb2_grpc.VoiceAgentServiceStub(channel)
+                stt_framework = voice_agent_pb2.VOSK if stt_framework == "vosk" else voice_agent_pb2.WHISPER
                 print("[+] Recording voice command in manual mode...")
-                record_start_request = voice_agent_pb2.RecognizeVoiceControl(action=voice_agent_pb2.START, nlu_model=nlu_engine, record_mode=voice_agent_pb2.MANUAL)
+                record_start_request = voice_agent_pb2.RecognizeVoiceControl(action=voice_agent_pb2.START, nlu_model=nlu_engine, record_mode=voice_agent_pb2.MANUAL, stt_framework=stt_framework)
                 response = stub.RecognizeVoiceCommand(iter([record_start_request]))
                 stream_id = response.stream_id
 
                 time.sleep(recording_time) # pause here for the number of seconds passed by user or default 5 seconds
 
-                record_stop_request = voice_agent_pb2.RecognizeVoiceControl(action=voice_agent_pb2.STOP, nlu_model=nlu_engine, record_mode=voice_agent_pb2.MANUAL, stream_id=stream_id)
+                record_stop_request = voice_agent_pb2.RecognizeVoiceControl(action=voice_agent_pb2.STOP, nlu_model=nlu_engine, record_mode=voice_agent_pb2.MANUAL, stream_id=stream_id,stt_framework=stt_framework)
                 record_result = stub.RecognizeVoiceCommand(iter([record_stop_request]))
                 print("[+] Voice command recording ended!")
                 
