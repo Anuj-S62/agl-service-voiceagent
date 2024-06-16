@@ -11,6 +11,15 @@ service VoiceAgentService {
   rpc ExecuteCommand(ExecuteInput) returns (ExecuteResult);
 }
 
+enum STTFramework {
+  VOSK = 0;
+  WHISPER = 1;
+}
+
+enum OnlineMode {
+  ONLINE = 0;
+  OFFLINE = 1;
+}
 
 enum RecordAction {
   START = 0;
@@ -69,6 +78,7 @@ message S_RecognizeVoiceControl {
   VoiceAudio audio_stream = 1;
   NLUModel nlu_model = 2;
   string stream_id = 3;
+  STTFramework stt_framework = 4;
 }
 
 message RecognizeVoiceControl {
@@ -76,6 +86,8 @@ message RecognizeVoiceControl {
   NLUModel nlu_model = 2;
   RecordMode record_mode = 3;
   string stream_id = 4;
+  STTFramework stt_framework = 5;
+  OnlineMode online_mode = 6;
 }
 
 message RecognizeTextControl {

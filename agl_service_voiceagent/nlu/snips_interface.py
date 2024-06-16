@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import re
 from typing import Text
 from snips_inference_agl import SnipsNLUEngine
@@ -47,6 +46,10 @@ class SnipsInterface:
         preprocessed_text = text.lower().strip()
         # remove special characters, punctuation, and extra whitespaces
         preprocessed_text = re.sub(r'[^\w\s]', '', preprocessed_text).strip()
+        # replace % with " precent"
+        preprocessed_text = re.sub(r'%', ' percent', preprocessed_text)
+        # replace ° with " degrees"
+        preprocessed_text = re.sub(r'°', ' degrees ', preprocessed_text)
         return preprocessed_text
 
     def extract_intent(self, text: Text):

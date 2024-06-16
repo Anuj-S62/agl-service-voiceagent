@@ -66,6 +66,9 @@ class AudioRecorder:
         self.pipeline = Gst.Pipeline()
         autoaudiosrc = Gst.ElementFactory.make("autoaudiosrc", None)
         queue = Gst.ElementFactory.make("queue", None)
+        queue.set_property("max-size-buffers", 0)
+        queue.set_property("max-size-bytes", 0)
+        queue.set_property("max-size-time", 0)
         audioconvert = Gst.ElementFactory.make("audioconvert", None)
         wavenc = Gst.ElementFactory.make("wavenc", None)
 

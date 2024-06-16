@@ -46,7 +46,7 @@ class WakeWordDetector:
         self.channels = channels
         self.bits_per_sample = bits_per_sample
         self.wake_word_model = stt_model # Speech to text model recognizer
-        self.recognizer_uuid = stt_model.setup_recognizer() 
+        self.recognizer_uuid = stt_model.setup_vosk_recognizer()
         self.audio_buffer = bytearray()
         self.segment_size = int(self.sample_rate * 1.0)  # Adjust the segment size (e.g., 1 second)
      
@@ -140,7 +140,7 @@ class WakeWordDetector:
 
         # Perform wake word detection on the audio_data
         if self.wake_word_model.init_recognition(self.recognizer_uuid, audio_data):
-            stt_result = self.wake_word_model.recognize(self.recognizer_uuid)
+            stt_result = self.wake_word_model.recognize_using_vosk(self.recognizer_uuid)
             print("STT Result: ", stt_result)
             if self.wake_word in stt_result["text"]:
                 self.wake_word_detected = True
