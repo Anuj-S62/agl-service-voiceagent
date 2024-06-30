@@ -16,6 +16,11 @@ enum STTFramework {
   WHISPER = 1;
 }
 
+enum OnlineMode {
+  ONLINE = 0;
+  OFFLINE = 1;
+}
+
 enum RecordAction {
   START = 0;
   STOP = 1;
@@ -82,6 +87,7 @@ message RecognizeVoiceControl {
   RecordMode record_mode = 3;
   string stream_id = 4;
   STTFramework stt_framework = 5;
+  OnlineMode online_mode = 6;
 }
 
 message RecognizeTextControl {

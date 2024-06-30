@@ -21,6 +21,7 @@ setup(
         "tensorflow",
         "tensorboard",
         "keras",
+        "openai-whisper"
     ],
     license="Apache-2.0",
     python_requires=">=3.9",

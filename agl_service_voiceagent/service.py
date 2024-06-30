@@ -61,6 +61,13 @@ def main():
     server_parser.add_argument('--audio-store-dir', required=False, help='Directory to store the generated audio files.')
     server_parser.add_argument('--log-store-dir', required=False, help='Directory to store the generated log files.')
 
+    # Arguments for online mode
+    server_parser.add_argument('--online-mode', required=False, help='Enable online mode for the Voice Agent Service (default is False).')
+    server_parser.add_argument('--online-mode-address', required=False, help='URL of the online server to connect to.')
+    server_parser.add_argument('--online-mode-port', required=False, help='Port of the online server to connect to.')
+    server_parser.add_argument('--online-mode-timeout', required=False, help='Timeout value in seconds for the online server connection.')
+
+
     # Add the arguments for the client
     client_parser.add_argument('--server-address', required=True, help='Address of the gRPC server running the Voice Agent Service.')
     client_parser.add_argument('--server-port', required=True, help='Port of the gRPC server running the Voice Agent Service.')
@@ -69,6 +76,9 @@ def main():
     client_parser.add_argument('--nlu', help='NLU engine/model to use. Supported NLU engines: "snips" and "rasa".')
     client_parser.add_argument('--recording-time', help='Number of seconds to continue recording the voice command. Required by the \'manual\' mode. Defaults to 10 seconds.')
     client_parser.add_argument('--stt-framework', help='STT framework to use. Supported frameworks: "vosk". Defaults to "vosk".')
+
+    # Arguments for online mode in client as --online-mode is a reserved keyword
+    client_parser.add_argument('--online-mode', required=False, help='Enable online mode for the Voice Agent Service (default is False).')
 
     args = parser.parse_args()
     
@@ -101,6 +111,16 @@ def main():
                 print("Error: The --vss-signals-spec-path is missing. Please provide a value. Use --help to see available options.")
                 exit(1)
             
+            # Error check for online mode
+            if args.online_mode:
+                if not args.online_mode_address:
+                    print("Error: The --online-mode-address is missing. Please provide a value. Use --help to see available options.")
+                    exit(1)
+                
+                if not args.online_mode_port:
+                    print("Error: The --online-mode-port is missing. Please provide a value. Use --help to see available options.")
+                    exit(1)    
+                           
             # Contruct the default config file path
             config_path = os.path.join(current_dir, "config.ini")
 
@@ -118,6 +138,18 @@ def main():
             rasa_model_path = args.rasa_model_path
             intents_vss_map_path = args.intents_vss_map_path
             vss_signals_spec_path = args.vss_signals_spec_path
+            
+            # Get the values for online mode
+            online_mode = False
+            if args.online_mode:
+                online_mode = True
+                online_mode_address = args.online_mode_address
+                online_mode_port = args.online_mode_port
+                online_mode_timeout = args.online_mode_timeout or 5
+                update_config_value('1', 'ONLINE_MODE')
+                update_config_value(online_mode_address, 'ONLINE_MODE_ADDRESS')
+                update_config_value(online_mode_port, 'ONLINE_MODE_PORT')
+                update_config_value(online_mode_timeout, 'ONLINE_MODE_TIMEOUT')
             
             # Convert to an absolute path if it's a relative path
             vosk_path = add_trailing_slash(os.path.abspath(vosk_path)) if not os.path.isabs(vosk_path) else vosk_path
@@ -186,6 +218,7 @@ def main():
         action = args.action
         recording_time = 5 # seconds
         stt_framework = args.stt_framework or "vosk"
+        online_mode = args.online_mode or False
 
         if action not in ["GetStatus", "DetectWakeWord", "ExecuteVoiceCommand", "ExecuteTextCommand"]:
             print("Error: Invalid value for --action. Supported actions: 'GetStatus', 'DetectWakeWord', 'ExecuteVoiceCommand' and 'ExecuteTextCommand'. Use --help to see available options.")
@@ -214,8 +247,14 @@ def main():
                 exit(1)
             if args.stt_framework:
                 stt_framework = args.stt_framework
+            
+            if args.online_mode and args.online_mode not in ['True', 'False', 'true', 'false', '1', '0']:
+                print("Error: Invalid value for --online-mode. Supported values: 'True' and 'False'. Use --help to see available options.")
+                exit(1)
+            if args.online_mode:
+                online_mode = True if args.online_mode in ['True', 'true', '1'] else False
 
-        run_client(server_address, server_port, action, mode, nlu_engine, recording_time, stt_framework)
+        run_client(server_address, server_port, action, mode, nlu_engine, recording_time, stt_framework, online_mode)
 
     else:
         print_version()
