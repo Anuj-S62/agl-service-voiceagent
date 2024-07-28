@@ -54,7 +54,13 @@ def run_client(server_address, server_port, action, mode, nlu_engine, recording_
         
         elif action == 'ExecuteVoiceCommand':
             if mode == 'auto':
-                raise ValueError("[-] Auto mode is not implemented yet.")
+                # raise ValueError("[-] Auto mode is not implemented yet.")
+                stub = voice_agent_pb2_grpc.VoiceAgentServiceStub(channel=channel)
+                stt_framework = voice_agent_pb2.VOSK if stt_framework == "vosk" else voice_agent_pb2.WHISPER
+                online_mode = voice_agent_pb2.ONLINE if online_mode == True else voice_agent_pb2.OFFLINE
+                print("[+] Recording voice command in auto mode...")
+                record_start_request = voice_agent_pb2.RecognizeVoiceControl(action=voice_agent_pb2.START, nlu_model=nlu_engine, record_mode=voice_agent_pb2.AUTO, stt_framework=stt_framework,online_mode=online_mode,)
+                
 
             elif mode == 'manual':
                 stub = voice_agent_pb2_grpc.VoiceAgentServiceStub(channel)

@@ -19,6 +19,7 @@ sys.path.append("../")
 import json
 import time
 import threading
+import asyncio
 from agl_service_voiceagent.generated import voice_agent_pb2
 from agl_service_voiceagent.generated import voice_agent_pb2_grpc
 from agl_service_voiceagent.utils.audio_recorder import AudioRecorder
@@ -31,6 +32,8 @@ from agl_service_voiceagent.utils.common import generate_unique_uuid, delete_fil
 from agl_service_voiceagent.nlu.snips_interface import SnipsInterface
 from agl_service_voiceagent.nlu.rasa_interface import RASAInterface
 from agl_service_voiceagent.utils.stt_online_service import STTOnlineService
+from agl_service_voiceagent.utils.vss_interface import VSSInterface
+from kuksa_client.grpc import Datapoint
 
 
 class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
@@ -94,14 +97,88 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
             self.logger.info(f"RASA intent engine detached mode detected! Assuming RASA server is running at URL: 127.0.0.1:{self.rasa_server_port}")
 
         self.rvc_stream_uuids = {}
-        self.kuksa_client = KuksaInterface()
-        self.kuksa_client.connect_kuksa_client()
-        self.kuksa_client.authorize_kuksa_client()
 
         self.logger.info(f"Loading and parsing mapping files...")
         self.mapper = Intent2VSSMapper()
         self.logger.info(f"Successfully loaded and parsed mapping files.")
 
+        self.vss_interface = VSSInterface()
+        self.vss_thread = threading.Thread(target=self.start_vss_client)
+        self.vss_thread.start()
+        self.vss_event_loop = None
+        
+    # VSS client methods
+
+    def start_vss_client(self):
+        """
+        Start the VSS client.
+        """
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.vss_interface.connect_vss_client())
+        self.vss_event_loop = loop
+        loop.run_forever()
+
+    def connect_vss_client(self):
+        """
+        Connect the VSS client.
+        """
+        future = asyncio.run_coroutine_threadsafe(
+            self.vss_interface.connect_vss_client(), 
+            self.vss_event_loop
+        )
+        return future.result()
+
+    def set_current_values(self, path=None, value=None):
+        """
+        Set the current values.
+
+        Args:
+            path (str): The path to set.
+            value (any): The value to set.
+        """
+        future = asyncio.run_coroutine_threadsafe(
+            self.vss_interface.set_current_values(path, value),
+            self.vss_event_loop
+        )
+        return future.result()
+
+    def get_current_values(self, paths=None):
+        """
+        Get the current values.
+
+        Args:
+            paths (list): The paths to get.
+
+        Returns:
+            dict: The current values.
+        """
+        print("Getting current values for paths:", paths)
+        future = asyncio.run_coroutine_threadsafe(
+            self.vss_interface.get_current_values(paths), 
+            self.vss_event_loop
+        )
+        return future.result()
+
+    def disconnect_vss_client(self):
+        """
+        Disconnect the VSS client.
+        """
+        future = asyncio.run_coroutine_threadsafe(
+            self.vss_interface.disconnect_vss_client(), 
+            self.vss_event_loop
+        )
+        return future.result()
+    
+    def get_vss_server_info(self):
+        """
+        Get the VSS server information.
+        """
+        future = asyncio.run_coroutine_threadsafe(
+            self.vss_interface.get_server_info(), 
+            self.vss_event_loop
+        )
+        return future.result()
 
     def CheckServiceStatus(self, request, context):
         """
@@ -370,6 +447,9 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
         """
         Execute the voice command by sending the intent to Kuksa.
         """
+        if self.vss_interface.is_connected==False:
+            self.logger.error("Kuksa client found disconnected. Trying to close old instance and re-connecting...")
+            self.connect_vss_client()
         # Log the unique request ID, client's IP address, and the endpoint
         request_id = generate_unique_uuid(8)
         client_ip = context.peer()
@@ -382,36 +462,53 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
             slot_name = slot.name
             slot_value = slot.value
             processed_slots.append({"name": slot_name, "value": slot_value})
-
         print(intent)
         print(processed_slots)
         execution_list = self.mapper.parse_intent(intent, processed_slots, req_id=request_id)
         exec_response = f"Sorry, I failed to execute command against intent '{intent}'. Maybe try again with more specific instructions."
         exec_status = voice_agent_pb2.EXEC_ERROR
-
         # Check for kuksa status, and try re-connecting again if status is False 
-        if not self.kuksa_client.get_kuksa_status():
+        if self.vss_interface.is_connected:
+            self.logger.info(f"[ReqID#{request_id}] Kuksa client found connected.")
+        else:
             self.logger.error(f"[ReqID#{request_id}] Kuksa client found disconnected. Trying to close old instance and re-connecting...")
-            self.kuksa_client.close_kuksa_client()
-            self.kuksa_client.connect_kuksa_client()
-            self.kuksa_client.authorize_kuksa_client()
-
+            exec_response = "Uh oh, I failed to connect to Kuksa."
+            exec_status = voice_agent_pb2.KUKSA_CONN_ERROR
+            self.disconnect_vss_client()
+            return voice_agent_pb2.ExecuteResult(
+                response=exec_response,
+                status=exec_status
+            )
+        
+        if not self.vss_interface.is_connected:
+            self.logger.error(f"[ReqID#{request_id}] Kuksa client failed to connect.")
+            exec_response = "Uh oh, I failed to connect to Kuksa."
+            exec_status = voice_agent_pb2.KUKSA_CONN_ERROR
+            response = voice_agent_pb2.ExecuteResult(
+                response=exec_response,
+                status=exec_status
+            )
+            return response
         for execution_item in execution_list:
             print(execution_item)
             action = execution_item["action"]
             signal = execution_item["signal"]
 
-            if self.kuksa_client.get_kuksa_status():
+            if self.vss_interface.is_connected:
                 if action == "set" and "value" in execution_item:
                     value = execution_item["value"]
-                    if self.kuksa_client.send_values(signal, value):
+                    response = self.set_current_values(signal, value)
+                    if response is None or response is False:
+                        exec_response = "Uh oh, I failed to send value to Kuksa."
+                        exec_status = voice_agent_pb2.KUKSA_CONN_ERROR
+                    else:
                         exec_response = f"Yay, I successfully updated the intent '{intent}' to value '{value}'."
                         exec_status = voice_agent_pb2.EXEC_SUCCESS
-                
+
                 elif action in ["increase", "decrease"]:
                     if "value" in execution_item:
                         value = execution_item["value"]
-                        if self.kuksa_client.send_values(signal, value):
+                        if self.set_current_values(signal, value):
                             exec_response = f"Yay, I successfully updated the intent '{intent}' to value '{value}'."
                             exec_status = voice_agent_pb2.EXEC_SUCCESS
                     
@@ -419,22 +516,26 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                         # incoming values are always str as kuksa expects str during subscribe we need to convert
                         # the value to int before performing any arithmetic operations and then convert back to str
                         factor = int(execution_item["factor"]) 
-                        current_value = self.kuksa_client.get_value(signal)
-                        if current_value:
-                            current_value = int(current_value)
-                            if action == "increase":
-                                value = current_value + factor
-                                value = str(value)
-                            elif action == "decrease":
-                                value = current_value - factor
-                                value = str(value)
-                            if self.kuksa_client.send_values(signal, value):
-                                exec_response = f"Yay, I successfully updated the intent '{intent}' to value '{value}'."
-                                exec_status = voice_agent_pb2.EXEC_SUCCESS
-                        
-                        else:
+                        current_value = self.get_current_values(signal)
+                        if current_value is None:
                             exec_response = f"Uh oh, there is no value set for intent '{intent}'. Why not try setting a value first?"
                             exec_status = voice_agent_pb2.KUKSA_CONN_ERROR
+                        else:
+                            if current_value:
+                                current_value = int(current_value)
+                                if action == "increase":
+                                    value = current_value + factor
+                                    value = str(value)
+                                elif action == "decrease":
+                                    value = current_value - factor
+                                    value = str(value)
+                                if self.set_current_values(signal, value):
+                                    exec_response = f"Yay, I successfully updated the intent '{intent}' to value '{value}'."
+                                    exec_status = voice_agent_pb2.EXEC_SUCCESS
+
+                            else:
+                                exec_response = f"Uh oh, there is no value set for intent '{intent}'. Why not try setting a value first?"
+                                exec_status = voice_agent_pb2.KUKSA_CONN_ERROR
 
             else:
                 exec_response = "Uh oh, I failed to connect to Kuksa."

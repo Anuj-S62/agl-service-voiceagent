@@ -34,7 +34,7 @@
                 }
             }
         },
-        "Vehicle.Cabin.HVAC.Station.Row1.Left.FanSpeed": {
+        "Vehicle.Cabin.HVAC.Station.Row1.Driver.FanSpeed": {
             "default_value": 25,
             "default_change_factor": 5,
             "actions": {
@@ -68,7 +68,7 @@
                 }
             }
         },
-        "Vehicle.Cabin.HVAC.Station.Row1.Right.FanSpeed": {
+        "Vehicle.Cabin.HVAC.Station.Row1.Passenger.FanSpeed": {
             "default_value": 25,
             "default_change_factor": 5,
             "actions": {
@@ -102,7 +102,7 @@
                 }
             }
         },
-        "Vehicle.Cabin.HVAC.Station.Row2.Left.FanSpeed": {
+        "Vehicle.Cabin.HVAC.Station.Row2.Driver.FanSpeed": {
             "default_value": 25,
             "default_change_factor": 5,
             "actions": {
@@ -136,7 +136,7 @@
                 }
             }
         },
-        "Vehicle.Cabin.HVAC.Station.Row2.Right.FanSpeed": {
+        "Vehicle.Cabin.HVAC.Station.Row2.Passenger.FanSpeed": {
             "default_value": 25,
             "default_change_factor": 5,
             "actions": {
@@ -170,7 +170,7 @@
                 }
             }
         },
-        "Vehicle.Cabin.HVAC.Station.Row1.Left.Temperature": {
+        "Vehicle.Cabin.HVAC.Station.Row1.Driver.Temperature": {
             "default_value": 25,
             "default_change_factor": 2,
             "actions": {
@@ -204,7 +204,7 @@
                 }
             }
         },
-        "Vehicle.Cabin.HVAC.Station.Row1.Right.Temperature": {
+        "Vehicle.Cabin.HVAC.Station.Row1.Passenger.Temperature": {
             "default_value": 25,
             "default_change_factor": 2,
             "actions": {
@@ -238,7 +238,7 @@
                 }
             }
         },
-        "Vehicle.Cabin.HVAC.Station.Row2.Left.Temperature": {
+        "Vehicle.Cabin.HVAC.Station.Row2.Driver.Temperature": {
             "default_value": 25,
             "default_change_factor": 2,
             "actions": {
@@ -272,7 +272,7 @@
                 }
             }
         },
-        "Vehicle.Cabin.HVAC.Station.Row2.Right.Temperature": {
+        "Vehicle.Cabin.HVAC.Station.Row2.Passenger.Temperature": {
             "default_value": 25,
             "default_change_factor": 2,
             "actions": {
