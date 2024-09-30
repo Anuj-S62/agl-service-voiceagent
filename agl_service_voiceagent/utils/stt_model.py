@@ -21,7 +21,7 @@ import wave
 from agl_service_voiceagent.utils.common import generate_unique_uuid
 
 # import the whisper model
-import whisper
+# import whisper
 # for whisper timeout feature
 from concurrent.futures import ThreadPoolExecutor  
 import subprocess
@@ -93,28 +93,28 @@ class STTModel:
         return result
     
     # Recognize speech using the whisper model
-    def recognize_using_whisper(self,filename,language = None,timeout = 5,fp16=False):
-        """
-        Recognize speech and return the result as a JSON object.
+    # def recognize_using_whisper(self,filename,language = None,timeout = 5,fp16=False):
+    #     """
+    #     Recognize speech and return the result as a JSON object.
 
-        Args:
-            filename (str): The path to the audio file.
-            timeout (int, optional): The timeout for recognition (default is 5 seconds).
-            fp16 (bool, optional): If True, use 16-bit floating point precision, (default is False) because cuda is not supported.
-            language (str, optional): The language code for recognition (default is None).
+    #     Args:
+    #         filename (str): The path to the audio file.
+    #         timeout (int, optional): The timeout for recognition (default is 5 seconds).
+    #         fp16 (bool, optional): If True, use 16-bit floating point precision, (default is False) because cuda is not supported.
+    #         language (str, optional): The language code for recognition (default is None).
 
-        Returns:
-            dict: A JSON object containing recognition results.
-        """
-        def transcribe_with_whisper():
-            return self.whisper_model.transcribe(filename, language = language,fp16=fp16)
+    #     Returns:
+    #         dict: A JSON object containing recognition results.
+    #     """
+    #     def transcribe_with_whisper():
+    #         return self.whisper_model.transcribe(filename, language = language,fp16=fp16)
         
-        with ThreadPoolExecutor() as executor:
-            future = executor.submit(transcribe_with_whisper)
-            try:
-                return future.result(timeout=timeout)
-            except TimeoutError:
-                return {"error": "Transcription with Whisper exceeded the timeout."}
+    #     with ThreadPoolExecutor() as executor:
+    #         future = executor.submit(transcribe_with_whisper)
+    #         try:
+    #             return future.result(timeout=timeout)
+    #         except TimeoutError:
+    #             return {"error": "Transcription with Whisper exceeded the timeout."}
             
     def recognize_using_whisper_cpp(self,filename):
         command = self.whisper_cpp_path
@@ -143,6 +143,7 @@ class STTModel:
         Returns:
             str: The recognized text or error messages.
         """
+        filename = "/Users/anujsolanki/new-test.wav"
         if not os.path.exists(filename):
             print(f"Audio file '{filename}' not found.")
             return "FILE_NOT_FOUND"
