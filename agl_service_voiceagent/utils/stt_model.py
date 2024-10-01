@@ -118,8 +118,8 @@ class STTModel:
     #             return {"error": "Transcription with Whisper exceeded the timeout."}
             
     def recognize_using_whisper_cpp(self,filename):
-        sleep(3)
-        return {"text": "Can you reduce the volume"}
+        # sleep(3)
+        # return {"text": "Can you reduce the volume"}
         command = self.whisper_cpp_path
         arguments = ["-m", self.whisper_cpp_model_path, "-f", filename, "-l", "en","-nt"]
 
