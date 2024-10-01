@@ -146,7 +146,6 @@ class STTModel:
         Returns:
             str: The recognized text or error messages.
         """
-        filename = "/Users/anujsolanki/new-test.wav"
         if not os.path.exists(filename):
             print(f"Audio file '{filename}' not found.")
             return "FILE_NOT_FOUND"
