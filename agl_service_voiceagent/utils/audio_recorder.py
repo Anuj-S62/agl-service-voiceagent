@@ -64,7 +64,7 @@ class AudioRecorder:
         """
         print("Creating pipeline for audio recording in {} mode...".format(self.mode))
         self.pipeline = Gst.Pipeline()
-        autoaudiosrc = Gst.ElementFactory.make("autoaudiosrc", None)
+        autoaudiosrc = Gst.ElementFactory.make("alsasrc", None)
         queue = Gst.ElementFactory.make("queue", None)
         queue.set_property("max-size-buffers", 0)
         queue.set_property("max-size-bytes", 0)
@@ -192,7 +192,7 @@ class AudioRecorder:
 from time import sleep
 
 if __name__ == "__main__":
-    recorder = AudioRecorder("vosk", "./", 1, sample_rate=48000, bits_per_sample=16)
+    recorder = AudioRecorder("vosk", "./", 1, sample_rate=16000, bits_per_sample=16)
     recorder.set_pipeline_mode("auto")
     audio_file = recorder.create_pipeline()
     try:
