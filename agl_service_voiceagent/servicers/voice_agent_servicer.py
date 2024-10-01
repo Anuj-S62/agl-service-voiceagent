@@ -227,9 +227,17 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
         wake_word_detector.create_pipeline()
         detection_thread = threading.Thread(target=wake_word_detector.start_listening)
         detection_thread.start()
+        x = 0
         while True:
             status = wake_word_detector.get_wake_word_status()
             time.sleep(0.5)
+            x += 1
+            print(x)
+            # if(x>=6):
+            #     status = True
+            #     wake_word_detector.send_eos()
+            # if x ==-1:
+            #     status = True
             if not context.is_active():
                 wake_word_detector.send_eos()
                 break
@@ -280,8 +288,12 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                         "recorder": recorder,
                         "audio_file": audio_file
                     }
-                    
-                    recorder.start_recording()
+
+                    def record():
+                        recorder.start_recording()
+
+                    record_thread = threading.Thread(target=record)
+                    record_thread.start()
 
                 elif request.action == voice_agent_pb2.STOP:
                     stream_uuid = request.stream_id
@@ -294,6 +306,7 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                     recorder = self.rvc_stream_uuids[stream_uuid]["recorder"]
                     audio_file = self.rvc_stream_uuids[stream_uuid]["audio_file"]
                     del self.rvc_stream_uuids[stream_uuid]
+                    print(use_online_mode)
 
                     recorder.stop_recording()
                                       
@@ -316,7 +329,6 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                         recognizer_uuid = self.stt_model.setup_vosk_recognizer()
                         stt = self.stt_model.recognize_from_file(recognizer_uuid, audio_file,stt_framework=stt_framework)
                         used_kaldi = True
-
                     print(stt)
                     if stt not in ["FILE_NOT_FOUND", "FILE_FORMAT_INVALID", "VOICE_NOT_RECOGNIZED", ""]:
                         if request.nlu_model == voice_agent_pb2.SNIPS:
@@ -516,7 +528,7 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                     exec_response = "Uh oh, I failed to stop the media."
                     exec_status = voice_agent_pb2.EXEC_ERROR
             else:
-                exec_response = "Sorry, I failed to execute command against intent 'MediaControl'. Maybe try again with more specific instructions."
+                exec_response = "Sorry, I failed to execute command."
                 exec_status = voice_agent_pb2.EXEC_ERROR
             
 
@@ -572,7 +584,7 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                     if "value" in execution_item:
                         value = execution_item["value"]
                         if self.set_current_values(signal, value):
-                            exec_response = f"Yay, I successfully updated the intent '{intent}' to value '{value}'."
+                            exec_response = f"Yay, I successfully updated '{intent}' to value '{value}'."
                             exec_status = voice_agent_pb2.EXEC_SUCCESS
                     
                     elif "factor" in execution_item:
@@ -593,7 +605,7 @@ class VoiceAgentServicer(voice_agent_pb2_grpc.VoiceAgentServiceServicer):
                                     value = current_value - factor
                                     value = str(value)
                                 if self.set_current_values(signal, value):
-                                    exec_response = f"Yay, I successfully updated the intent '{intent}' to value '{value}'."
+                                    exec_response = f"Yay, I successfully updated '{intent}' to value '{value}'."
                                     exec_status = voice_agent_pb2.EXEC_SUCCESS
 
                             else:

@@ -109,6 +109,7 @@ class AudioRecorder:
         Start recording audio using the GStreamer pipeline.
         """
         self.pipeline.set_state(Gst.State.PLAYING)
+        self.loop.run()
         print("Recording Voice Input...")
 
 
@@ -186,3 +187,17 @@ class AudioRecorder:
             print("Pipeline cleanup complete!")
             self.bus = None
             self.pipeline = None
+            self.loop.quit()
+
+from time import sleep
+
+if __name__ == "__main__":
+    recorder = AudioRecorder("vosk", "./", 1, sample_rate=48000, bits_per_sample=16)
+    recorder.set_pipeline_mode("auto")
+    audio_file = recorder.create_pipeline()
+    try:
+        recorder.start_recording()
+        recorder.loop.run()
+    except KeyboardInterrupt:
+        recorder.stop_recording()
+        recorder.cleanup_pipeline()
