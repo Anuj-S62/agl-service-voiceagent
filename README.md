@@ -70,6 +70,7 @@ Replace `NLU_ENGINE` with the preferred NLU engine ("snips" or "rasa"), `SERVER_
 Configuration options for the AGL Voice Agent Service can be found in the default `config.ini` file. You can customize various settings, including the AI models, audio directories, and Kuksa integration. **Important:** while manually making changes to the config file make sure you add trailing slash to all the directory paths, ie. the paths to directories should always end with a `/`. 
 
 ## Maintainers
+- **Anuj Solanki** <anuj603362@gmail.com>
 - **Malik Talha** <talhamalik727x@gmail.com>
 
 ## License
